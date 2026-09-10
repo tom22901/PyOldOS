@@ -1,0 +1,105 @@
+{
+  "windows": [
+    {
+      "title": "控制面板 & 控件测试",
+      "x": 100,
+      "y": 80,
+      "w": 380,
+      "h": 320,
+      "context_menu": [
+        {
+          "label": "窗口选项",
+          "submenu": [
+            {
+              "label": "显示信息提示",
+              "action": "show_info"
+            },
+            {
+              "label": "清空输入内容",
+              "action": "reset_input"
+            }
+          ]
+        },
+        {
+          "label": "关闭",
+          "action": "sys_info"
+        }
+      ],
+      "children": [
+        {
+          "type": "label",
+          "text": "测试多功能控件组件:",
+          "x": 15,
+          "y": 10
+        },
+        {
+          "type": "button",
+          "id": "btn_info",
+          "text": "信息框",
+          "x": 15,
+          "y": 35,
+          "w": 70,
+          "h": 25
+        },
+        {
+          "type": "button",
+          "id": "btn_warn",
+          "text": "警告框",
+          "x": 95,
+          "y": 35,
+          "w": 70,
+          "h": 25
+        },
+        {
+          "type": "button",
+          "id": "btn_input",
+          "text": "输入框",
+          "x": 175,
+          "y": 35,
+          "w": 70,
+          "h": 25
+        },
+        {
+          "type": "checkbox",
+          "text": "启用系统音效",
+          "x": 15,
+          "y": 75,
+          "checked": true
+        },
+        {
+          "type": "radio",
+          "options": ["低画质", "中画质", "高画质"],
+          "x": 15,
+          "y": 100,
+          "selected_index": 1
+        },
+        {
+          "type": "textbox",
+          "text": "可编辑文本...",
+          "x": 160,
+          "y": 75,
+          "w": 200,
+          "h": 24,
+          "align": "fill"
+        },
+        {
+          "type": "progressbar",
+          "progress": 0.65,
+          "x": 160,
+          "y": 115,
+          "w": 200,
+          "h": 20,
+          "align": "fill"
+        },
+        {
+          "type": "combobox",
+          "options": ["选项 A", "选项 B", "选项 C"],
+          "x": 160,
+          "y": 150,
+          "w": 120,
+          "h": 22
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "title": "计算器",
+  "w": 220,
+  "h": 260,
+  "children": [
+    { "type": "textbox", "id": "display", "text": "0", "x": 10, "y": 10, "w": 200, "h": 30 },
+    { "type": "button", "id": "btn_1", "text": "1", "x": 10, "y": 50, "w": 40, "h": 40 },
+    { "type": "button", "id": "btn_2", "text": "2", "x": 60, "y": 50, "w": 40, "h": 40 },
+    { "type": "button", "id": "btn_add", "text": "+", "x": 110, "y": 50, "w": 40, "h": 40 },
+    { "type": "button", "id": "btn_calc", "text": "=", "x": 160, "y": 50, "w": 40, "h": 40 }
+  ]
+}

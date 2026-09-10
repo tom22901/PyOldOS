@@ -1,0 +1,57 @@
+{
+  "start_menu": [
+    { "label": "系统设置", "action": "app:settings" },
+    { "label": "画图程序", "action": "app:paint" },
+    { "label": "文件管理器", "action": "app:file_manager" },
+    { "label": "任务管理器", "action": "app:task_manager" },
+    { "label": "简易浏览器", "action": "app:browser" },
+    { "label": "计算器", "action": "app:calc" },
+    { "label": "记事本", "action": "app:notepad" },
+    { "label": "退出系统", "action": "quit" },
+    {
+      "label": "程序",
+      "submenu": [
+        {
+          "label": "新建测试窗口",
+          "action": "open_test_win"
+        },
+        {
+          "label": "清空文本框",
+          "action": "reset_input"
+        }
+      ]
+    },
+    {
+      "label": "系统工具",
+      "submenu": [
+        {
+          "label": "系统信息",
+          "action": "sys_info"
+        }
+      ]
+    },
+    {
+      "label": "退出系统",
+      "action": "quit"
+    }
+  ],
+  "desktop_context_menu": [
+    {
+      "label": "刷新桌面",
+      "action": "refresh"
+    },
+    {
+      "label": "新建",
+      "submenu": [
+        {
+          "label": "新建测试窗口",
+          "action": "open_test_win"
+        }
+      ]
+    },
+    {
+      "label": "关于系统",
+      "action": "sys_info"
+    }
+  ]
+}

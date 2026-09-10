@@ -1,0 +1,11 @@
+{
+  "title": "画图程序 - Paint",
+  "x": 100, "y": 80, "w": 450, "h": 350,
+  "children": [
+    { "type": "button", "id": "btn_red", "text": "红色", "x": 10, "y": 5, "w": 50, "h": 22 },
+    { "type": "button", "id": "btn_green", "text": "绿色", "x": 65, "y": 5, "w": 50, "h": 22 },
+    { "type": "button", "id": "btn_blue", "text": "蓝色", "x": 120, "y": 5, "w": 50, "h": 22 },
+    { "type": "button", "id": "btn_black", "text": "黑色", "x": 175, "y": 5, "w": 50, "h": 22 },
+    { "type": "button", "id": "btn_clear", "text": "清空", "x": 235, "y": 5, "w": 50, "h": 22 }
+  ]
+}

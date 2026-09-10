@@ -1,0 +1,19 @@
+{
+  "title": "文件资源管理器",
+  "x": 150,
+  "y": 100,
+  "w": 520,
+  "h": 380,
+  "children": [
+    { "type": "label", "id": "lbl_path", "text": "路径: ", "x": 10, "y": 10 },
+    { "type": "textbox", "id": "txt_path", "text": "", "x": 50, "y": 8, "w": 320, "h": 22 },
+    { "type": "button", "id": "btn_up", "text": "返回上级", "x": 380, "y": 6, "w": 65, "h": 24 },
+    { "type": "button", "id": "btn_refresh", "text": "刷新", "x": 450, "y": 6, "w": 50, "h": 24 },
+
+    { "type": "label", "id": "lbl_new_name", "text": "新建名称: ", "x": 10, "y": 40 },
+    { "type": "textbox", "id": "txt_new_name", "text": "new_folder", "x": 75, "y": 38, "w": 150, "h": 22 },
+    { "type": "button", "id": "btn_create_file", "text": "新建文件", "x": 235, "y": 36, "w": 70, "h": 24 },
+    { "type": "button", "id": "btn_create_dir", "text": "新建文件夹", "x": 310, "y": 36, "w": 80, "h": 24 },
+    { "type": "button", "id": "btn_delete", "text": "删除选中", "x": 420, "y": 36, "w": 80, "h": 24 }
+  ]
+}

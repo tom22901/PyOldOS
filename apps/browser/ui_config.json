@@ -1,0 +1,8 @@
+{
+  "title": "简易浏览器 - Browser",
+  "x": 220, "y": 140, "w": 300, "h": 120,
+  "children": [
+    { "type": "label", "text": "点击下方按钮启动 Qt WebEngine 浏览器", "x": 15, "y": 10 },
+    { "type": "button", "id": "btn_launch", "text": "启动浏览器 Window", "x": 15, "y": 40, "w": 160, "h": 25 }
+  ]
+}

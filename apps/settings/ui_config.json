@@ -1,0 +1,19 @@
+{
+  "title": "控制面板 / 系统设置",
+  "x": 200,
+  "y": 120,
+  "w": 400,
+  "h": 300,
+  "children": [
+    { "type": "label", "text": "--- 桌面壁纸颜色 ---", "x": 20, "y": 15 },
+    { "type": "combobox", "id": "combo_color", "options": ["复古青色", "经典经典蓝", "深橄榄绿", "暗黑夜空", "优雅深紫"], "x": 20, "y": 40, "w": 160, "h": 24 },
+    { "type": "button", "id": "btn_apply_color", "text": "应用颜色", "x": 190, "y": 40, "w": 80, "h": 24 },
+
+    { "type": "label", "text": "--- 屏幕分辨率 ---", "x": 20, "y": 90 },
+    { "type": "combobox", "id": "combo_res", "options": ["900x700 (默认)", "1024x768 (XGA)", "1280x800 (WXGA)", "800x600 (SVGA)"], "x": 20, "y": 115, "w": 160, "h": 24 },
+    { "type": "button", "id": "btn_apply_res", "text": "切换分辨率", "x": 190, "y": 115, "w": 80, "h": 24 },
+
+    { "type": "label", "text": "--- 系统提示 ---", "x": 20, "y": 165 },
+    { "type": "button", "id": "btn_about", "text": "关于系统", "x": 20, "y": 190, "w": 90, "h": 25 }
+  ]
+}
