@@ -1,4 +1,6 @@
 # 🖥️ Pygame Retro Desktop System
+<img width="898" height="721" alt="截屏2026-09-10 20 45 05" src="https://github.com/user-attachments/assets/9537ca49-b994-4268-a2bf-723218faa01a" />
+
 
 > **用 Python + Pygame 打造一个“真的像桌面操作系统”的复古 GUI 框架**
 >
