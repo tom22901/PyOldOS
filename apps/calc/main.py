@@ -1,4 +1,6 @@
 # apps/calc/main.py
+from arith import evaluate as safe_evaluate
+
 
 class CalcApp:
     def __init__(self, window, wm):
@@ -33,9 +35,10 @@ class CalcApp:
                 self.display.text += char
 
     def calculate(self):
-        if not self.display: return
+        if not self.display:
+            return
         try:
-            self.display.text = str(eval(self.display.text))
+            self.display.text = str(safe_evaluate(self.display.text))
         except Exception:
             self.display.text = "Error"
 

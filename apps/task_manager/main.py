@@ -1,8 +1,10 @@
 import pygame
 
+
 class TaskListUI:
     def __init__(self, x, y, w, h):
         self.rect = pygame.Rect(x, y, w, h)
+        self.id = ""  # 与 UIElement 子控件一致，供按 id 查找
         self.tasks = []  # tuple: (title, window_obj)
         self.selected_index = -1
 

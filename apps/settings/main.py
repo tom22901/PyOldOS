@@ -1,6 +1,7 @@
 import main as main_module  # 导入主模块以操作全局变量与函数
 from main import MessageBox
 
+
 class App:
     def __init__(self, window, wm):
         self.win = window
