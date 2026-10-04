@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+
 class App:
     def __init__(self, window, wm):
         self.win = window

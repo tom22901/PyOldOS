@@ -1,0 +1,43 @@
+[project]
+name = "pyoldos"
+version = "1.0.0"
+description = "Pygame retro desktop system: a config-driven GUI framework with apps, window manager, and SQLite login"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "pygame>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+pyoldos = "main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main", "arith"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"" = ["apps/**/*.json", "apps/**/*.py", "*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 119
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["F", "E9", "I"]
+ignore = ["E501"]

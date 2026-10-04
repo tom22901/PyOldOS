@@ -145,6 +145,17 @@ SYSTEM STARTING...
      DESKTOP
 ```
 
+## 运行测试
+
+```bash
+pip install -e ".[dev]"   # 或: pip install pytest ruff pygame
+pytest                    # 130 个离线测试，无需显示器 (headless)
+```
+
+测试通过 dummy 视频驱动 (`SDL_VIDEODRIVER=dummy`) 在无显示环境下运行，
+覆盖：安全算术求值器、用户认证、全部 UI 控件、窗口管理器、JSON 构建器
+以及所有内置 App（计算器 / 记事本 / 文件管理器 / 画图 / 设置 / 任务管理器）。
+
 ---
 
 # 🔐 默认登录账号
@@ -156,24 +167,30 @@ SYSTEM STARTING...
 | `admin` | `123456` | 管理员 |
 | `user` | `123456` | 普通用户 |
 
+> **安全说明**：数据库不保存明文密码。`password` 字段存储
+> `salt$sha256(salt + password)` 格式的加盐哈希；旧版明文记录会在
+> 启动时自动迁移为哈希。计算器不再使用 `eval()`，改用白名单
+> AST 求值器（`arith.py`），仅接受算术表达式。
+
 对应数据库逻辑：
 
 ```python
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
+    password TEXT NOT NULL,  -- salt$digest 加盐哈希
     role TEXT NOT NULL
 )
 ```
 
-登录验证使用参数化 SQL：
+登录验证使用参数化 SQL，并按用户名单独取回后做哈希比对：
 
 ```python
 cursor.execute(
-    "SELECT role FROM users WHERE username=? AND password=?",
-    (username, password)
+    "SELECT role, password FROM users WHERE username=?",
+    (username,)
 )
+# verify_password(stored, password): 先拆分 salt，再比对 SHA-256
 ```
 
 ---

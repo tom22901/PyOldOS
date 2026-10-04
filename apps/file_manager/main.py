@@ -1,7 +1,9 @@
 import os
 import shutil
+
 import pygame
-from main import UIElement, MessageBox, COLOR_WHITE, COLOR_BLACK, COLOR_HOVER, COLOR_DARK, COLOR_WIN_BG, font
+
+from main import COLOR_BLACK, COLOR_DARK, COLOR_HOVER, COLOR_WHITE, MessageBox, UIElement, font
 
 
 class FileListView(UIElement):
@@ -31,7 +33,6 @@ class FileListView(UIElement):
         old_clip = surface.get_clip()
         surface.set_clip(r.clip(old_clip))
 
-        visible_count = self.rect.h // self.item_height
         for i in range(len(self.items)):
             item_y = r.y + i * self.item_height - self.scroll_offset
             if item_y + self.item_height < r.y or item_y > r.bottom:

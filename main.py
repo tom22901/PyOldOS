@@ -1,19 +1,39 @@
-import pygame
-import sys
+import hashlib
+import importlib.util
 import json
 import os
+import secrets
 import sqlite3
+import sys
 from datetime import datetime
-import importlib.util
+
+import pygame
 
 # ==========================================
 # 0. 数据库与用户鉴权 (SQLite)
 # ==========================================
-DB_PATH = "system.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("PYOLDOS_DB", os.path.join(BASE_DIR, "system.db"))
 
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
+def hash_password(password, salt=None):
+    """以加盐 SHA-256 哈希保存密码，不使用明文。"""
+    if salt is None:
+        salt = secrets.token_hex(8)
+    digest = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"{salt}${digest}"
+
+
+def verify_password(stored, password):
+    """校验密码；兼容旧版本数据库中的明文记录。"""
+    if "$" in stored:
+        salt, digest = stored.split("$", 1)
+        return hashlib.sha256((salt + password).encode("utf-8")).hexdigest() == digest
+    return stored == password
+
+
+def init_db(db_path=None):
+    conn = sqlite3.connect(db_path or DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -23,22 +43,24 @@ def init_db():
             role TEXT NOT NULL  -- 'admin' 或 'user'
         )
     ''')
-    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', '123456', 'admin')")
-    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('user', '123456', 'user')")
+    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)",
+                   ("admin", hash_password("123456"), "admin"))
+    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)",
+                   ("user", hash_password("123456"), "user"))
     conn.commit()
     conn.close()
 
 
-def verify_login(username, password):
-    conn = sqlite3.connect(DB_PATH)
+def verify_login(username, password, db_path=None):
+    conn = sqlite3.connect(db_path or DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
+    cursor.execute("SELECT role, password FROM users WHERE username=?", (username,))
     result = cursor.fetchone()
     conn.close()
-    return result[0] if result else None
-
-
-init_db()
+    if not result:
+        return None
+    role, stored_password = result
+    return role if verify_password(stored_password, password) else None
 
 # ==========================================
 # 1. 全局配置与状态定义
@@ -931,20 +953,15 @@ class Taskbar:
 # ==========================================
 # 8. 应用与 JSON 依赖构建器
 # ==========================================
-def load_app_from_folder(app_folder_name, wm_ref, x_offset=0, y_offset=0):
-    app_dir = os.path.join("apps", app_folder_name)
-    ui_path = os.path.join(app_dir, "ui_config.json")
-    code_path = os.path.join(app_dir, "main.py")
+def build_window_from_data(win_data, wm_ref=None, default_title="窗口", x_offset=0,
+                           y_offset=0, bind_demo_callbacks=False):
+    """从一份 JSON 窗口描述创建 Window 及其子控件。
 
-    if not os.path.exists(ui_path):
-        print(f"配置文件缺失: {ui_path}")
-        return None
-
-    with open(ui_path, "r", encoding="utf-8") as f:
-        win_data = json.load(f)
-
+    供 load_app_from_folder 与 build_windows_from_json 共用，
+    保证两类窗口的构建逻辑完全一致。
+    """
     win = Window(
-        title=win_data.get("title", app_folder_name),
+        title=win_data.get("title", default_title),
         x=win_data.get("x", 100) + x_offset,
         y=win_data.get("y", 100) + y_offset,
         w=win_data.get("w", 300),
@@ -963,8 +980,23 @@ def load_app_from_folder(app_folder_name, wm_ref, x_offset=0, y_offset=0):
         if c_type == "label":
             element = Label(child_data.get("text", ""), cx, cy, align=align)
         elif c_type == "button":
-            element = Button(child_data.get("text", "按钮"), cx, cy, child_data.get("w", 80), child_data.get("h", 25),
-                             align=align)
+            cb = None
+            if bind_demo_callbacks:
+                if cid == "btn_info":
+                    cb = lambda: MessageBox.show_info(wm_ref, "信息", "这是普通信息框")
+                elif cid == "btn_warn":
+                    cb = lambda: MessageBox.show_warning(wm_ref, "警告", "发现警告问题！")
+                elif cid == "btn_err":
+                    cb = lambda: MessageBox.show_error(wm_ref, "错误", "操作触发错误❌")
+                elif cid == "btn_yesno":
+                    cb = lambda: MessageBox.show_yes_no(wm_ref, "确认", "是否确定执行动作？",
+                                                        on_yes=lambda: print("点了Yes"))
+                elif cid == "btn_input":
+                    cb = lambda: MessageBox.show_input(wm_ref, "录入", "请输入您的用户名:",
+                                                       on_submit=lambda txt: MessageBox.show_info(wm_ref, "结果",
+                                                                                                  f"输入为: {txt}"))
+            element = Button(child_data.get("text", "按钮"), cx, cy, child_data.get("w", 80),
+                             child_data.get("h", 25), callback=cb, align=align)
         elif c_type == "checkbox":
             element = CheckBox(child_data.get("text", ""), cx, cy, child_data.get("checked", False), align=align)
         elif c_type == "radio":
@@ -977,12 +1009,30 @@ def load_app_from_folder(app_folder_name, wm_ref, x_offset=0, y_offset=0):
             element = ProgressBar(cx, cy, child_data.get("w", 150), child_data.get("h", 18),
                                   child_data.get("progress", 0.0), align=align)
         elif c_type == "combobox":
-            element = ComboBox(child_data.get("options", []), cx, cy, child_data.get("w", 120), child_data.get("h", 22),
-                               align=align)
+            element = ComboBox(child_data.get("options", []), cx, cy, child_data.get("w", 120),
+                               child_data.get("h", 22), align=align)
 
         if element:
             element.id = cid
             win.add_child(element)
+
+    return win
+
+
+def load_app_from_folder(app_folder_name, wm_ref, x_offset=0, y_offset=0):
+    app_dir = os.path.join(BASE_DIR, "apps", app_folder_name)
+    ui_path = os.path.join(app_dir, "ui_config.json")
+    code_path = os.path.join(app_dir, "main.py")
+
+    if not os.path.exists(ui_path):
+        print(f"配置文件缺失: {ui_path}")
+        return None
+
+    with open(ui_path, "r", encoding="utf-8") as f:
+        win_data = json.load(f)
+
+    win = build_window_from_data(win_data, wm_ref=wm_ref, default_title=app_folder_name,
+                                 x_offset=x_offset, y_offset=y_offset)
 
     if os.path.exists(code_path):
         try:
@@ -1040,62 +1090,7 @@ def build_windows_from_json(win_config_path, wm_ref):
 
     loaded_windows = []
     for win_data in data.get("windows", []):
-        win = Window(
-            title=win_data.get("title", "窗口"),
-            x=win_data.get("x", 50),
-            y=win_data.get("y", 50),
-            w=win_data.get("w", 300),
-            h=win_data.get("h", 200),
-            context_menu_data=win_data.get("context_menu", []),
-            menu_bar_data=win_data.get("menu_bar", DEFAULT_MENU_BAR)  # 降级支持
-        )
-
-        for child_data in win_data.get("children", []):
-            c_type = child_data.get("type")
-            cx, cy = child_data.get("x", 0), child_data.get("y", 0)
-            cid = child_data.get("id", "")
-            align = child_data.get("align", "left")
-
-            element = None
-            if c_type == "label":
-                element = Label(child_data.get("text", ""), cx, cy, align=align)
-            elif c_type == "button":
-                cb = None
-                if cid == "btn_info":
-                    cb = lambda: MessageBox.show_info(wm_ref, "信息", "这是普通信息框")
-                elif cid == "btn_warn":
-                    cb = lambda: MessageBox.show_warning(wm_ref, "警告", "发现警告问题！")
-                elif cid == "btn_err":
-                    cb = lambda: MessageBox.show_error(wm_ref, "错误", "操作触发错误❌")
-                elif cid == "btn_yesno":
-                    cb = lambda: MessageBox.show_yes_no(wm_ref, "确认", "是否确定执行动作？",
-                                                        on_yes=lambda: print("点了Yes"))
-                elif cid == "btn_input":
-                    cb = lambda: MessageBox.show_input(wm_ref, "录入", "请输入您的用户名:",
-                                                       on_submit=lambda txt: MessageBox.show_info(wm_ref, "结果",
-                                                                                                  f"输入为: {txt}"))
-
-                element = Button(child_data.get("text", "按钮"), cx, cy, child_data.get("w", 80),
-                                 child_data.get("h", 25), callback=cb, align=align)
-            elif c_type == "checkbox":
-                element = CheckBox(child_data.get("text", ""), cx, cy, child_data.get("checked", False), align=align)
-            elif c_type == "radio":
-                element = RadioGroup(child_data.get("options", []), cx, cy, child_data.get("selected_index", 0),
-                                     align=align)
-            elif c_type == "textbox":
-                element = TextBox(child_data.get("text", ""), cx, cy, child_data.get("w", 120), child_data.get("h", 22),
-                                  align=align)
-            elif c_type == "progressbar":
-                element = ProgressBar(cx, cy, child_data.get("w", 150), child_data.get("h", 18),
-                                      child_data.get("progress", 0.0), align=align)
-            elif c_type == "combobox":
-                element = ComboBox(child_data.get("options", []), cx, cy, child_data.get("w", 120),
-                                   child_data.get("h", 22), align=align)
-
-            if element:
-                element.id = cid
-                win.add_child(element)
-
+        win = build_window_from_data(win_data, wm_ref=wm_ref, bind_demo_callbacks=True)
         loaded_windows.append(win)
     return loaded_windows
 
@@ -1107,8 +1102,8 @@ wm = WindowManager()
 selection_box = SelectionBox()
 
 taskbar_cfg = {"start_menu": [], "desktop_context_menu": []}
-if os.path.exists("taskbar_config.json"):
-    with open("taskbar_config.json", "r", encoding="utf-8") as f:
+if os.path.exists(os.path.join(BASE_DIR, "taskbar_config.json")):
+    with open(os.path.join(BASE_DIR, "taskbar_config.json"), "r", encoding="utf-8") as f:
         taskbar_cfg = json.load(f)
 
 system_operations = [
@@ -1120,7 +1115,7 @@ full_start_menu = taskbar_cfg.get("start_menu", []) + [{"label": "---", "action"
 
 taskbar = Taskbar(WIDTH, HEIGHT, full_start_menu)
 
-windows = build_windows_from_json("gui_config.json", wm)
+windows = build_windows_from_json(os.path.join(BASE_DIR, "gui_config.json"), wm)
 for w in windows:
     wm.add_window(w)
 
@@ -1142,6 +1137,21 @@ def handle_menu_action(action):
     if action.startswith("app:"):
         app_name = action.split(":")[1]
         load_app_from_folder(app_name, wm)
+    elif action == "show_info":
+        MessageBox.show_info(wm, "信息", "这是提示信息")
+    elif action == "reset_input":
+        # 清空所有已打开窗口中的文本框
+        for win in wm.windows:
+            for child in win.children:
+                if isinstance(child, TextBox):
+                    child.text = ""
+    elif action == "open_test_win":
+        # 打开一个新测试窗口（演示动态创建窗口）
+        win = Window("新测试窗口", 150 + len(wm.windows) * 20, 120 + len(wm.windows) * 15, 280, 160)
+        win.add_child(Label("这是一个动态创建的窗口", 15, 15))
+        win.add_child(TextBox("", 15, 45, 200, 22))
+        win.add_child(Button("确定", 15, 80, 70, 25))
+        wm.add_window(win)
     elif action == "sys_info":
         MessageBox.show_info(wm, "系统信息", f"Pygame Retro System v3.0\n当前用户: {current_user}")
     elif action == "sys_logout":
@@ -1164,116 +1174,123 @@ boot_timer = 0
 
 clock = pygame.time.Clock()
 
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
 
+def main():
+    global current_state, current_user, current_role, login_msg, boot_timer, active_context_menu, clock
+    init_db()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+    
+            if current_state == STATE_BOOT:
+                pass
+    
+            elif current_state == STATE_LOGIN:
+                login_tb_user.handle_event(event, 0, 0)
+                login_tb_pass.handle_event(event, 0, 0)
+    
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    btn_login_rect = pygame.Rect(WIDTH // 2 - 60, HEIGHT // 2 + 30, 120, 28)
+                    if btn_login_rect.collidepoint(event.pos):
+                        role = verify_login(login_tb_user.text, login_tb_pass.text)
+                        if role:
+                            current_user = login_tb_user.text
+                            current_role = role
+                            current_state = STATE_DESKTOP
+                            login_msg = ""
+                        else:
+                            login_msg = "用户名或密码错误!"
+    
+            elif current_state == STATE_DESKTOP:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                    mx, my = event.pos
+                    if my < HEIGHT - TASKBAR_HEIGHT:
+                        context_items = None
+                        for win in reversed(wm.windows):
+                            if not win.is_minimized and win.rect.collidepoint(mx, my):
+                                context_items = win.context_menu_data
+                                break
+                        if context_items is None:
+                            context_items = taskbar_cfg.get("desktop_context_menu", [])
+    
+                        if context_items:
+                            active_context_menu = Menu(context_items, mx, my)
+                        continue
+    
+                if active_context_menu:
+                    if active_context_menu.handle_event(event, handle_menu_action, close_context_menu):
+                        continue
+    
+                if taskbar.handle_event(event, handle_menu_action, wm):
+                    close_context_menu()
+                    continue
+    
+                if wm.handle_event(event):
+                    close_context_menu()
+                    continue
+    
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if event.pos[1] < HEIGHT - TASKBAR_HEIGHT:
+                        selection_box.start(event.pos)
+                elif event.type == pygame.MOUSEMOTION:
+                    selection_box.update(event.pos)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    selection_box.stop()
+    
         if current_state == STATE_BOOT:
-            pass
-
+            screen.fill(COLOR_BLACK)
+            boot_timer += 1
+            txt = font_large.render("SYSTEM STARTING...", True, COLOR_WHITE)
+            screen.blit(txt, (WIDTH // 2 - 130, HEIGHT // 2 - 40))
+    
+            pygame.draw.rect(screen, COLOR_WHITE, (WIDTH // 2 - 150, HEIGHT // 2 + 20, 300, 12), 1)
+            pygame.draw.rect(screen, COLOR_WHITE, (WIDTH // 2 - 148, HEIGHT // 2 + 22, boot_timer * 2.95, 8))
+    
+            if boot_timer >= 100:
+                current_state = STATE_LOGIN
+    
         elif current_state == STATE_LOGIN:
-            login_tb_user.handle_event(event, 0, 0)
-            login_tb_pass.handle_event(event, 0, 0)
-
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                btn_login_rect = pygame.Rect(WIDTH // 2 - 60, HEIGHT // 2 + 30, 120, 28)
-                if btn_login_rect.collidepoint(event.pos):
-                    role = verify_login(login_tb_user.text, login_tb_pass.text)
-                    if role:
-                        current_user = login_tb_user.text
-                        current_role = role
-                        current_state = STATE_DESKTOP
-                        login_msg = ""
-                    else:
-                        login_msg = "用户名或密码错误!"
-
+            screen.fill(COLOR_BG)
+            box = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 80, 300, 170)
+            pygame.draw.rect(screen, COLOR_WIN_BG, box)
+            pygame.draw.line(screen, COLOR_WHITE, box.topleft, box.topright)
+            pygame.draw.line(screen, COLOR_WHITE, box.topleft, box.bottomleft)
+            pygame.draw.line(screen, COLOR_BLACK, box.bottomleft, box.bottomright)
+            pygame.draw.line(screen, COLOR_BLACK, box.topright, box.bottomright)
+    
+            screen.blit(font.render("用户登录", True, COLOR_BLACK), (box.x + 120, box.y + 12))
+            screen.blit(font.render("账号:", True, COLOR_BLACK), (box.x + 25, box.y + 42))
+            screen.blit(font.render("密码:", True, COLOR_BLACK), (box.x + 25, box.y + 72))
+    
+            login_tb_user.draw(screen, 0, 0)
+            login_tb_pass.draw(screen, 0, 0)
+    
+            btn_login_rect = pygame.Rect(WIDTH // 2 - 60, HEIGHT // 2 + 35, 120, 26)
+            pygame.draw.rect(screen, COLOR_WIN_BG, btn_login_rect)
+            pygame.draw.line(screen, COLOR_WHITE, btn_login_rect.topleft, btn_login_rect.topright)
+            pygame.draw.line(screen, COLOR_WHITE, btn_login_rect.topleft, btn_login_rect.bottomleft)
+            pygame.draw.line(screen, COLOR_BLACK, btn_login_rect.bottomleft, btn_login_rect.bottomright)
+            pygame.draw.line(screen, COLOR_BLACK, btn_login_rect.topright, btn_login_rect.bottomright)
+            screen.blit(font.render("登 录", True, COLOR_BLACK), (btn_login_rect.x + 44, btn_login_rect.y + 4))
+    
+            if login_msg:
+                screen.blit(font.render(login_msg, True, (200, 0, 0)), (box.x + 80, box.y + 138))
+    
         elif current_state == STATE_DESKTOP:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-                mx, my = event.pos
-                if my < HEIGHT - TASKBAR_HEIGHT:
-                    context_items = None
-                    for win in reversed(wm.windows):
-                        if not win.is_minimized and win.rect.collidepoint(mx, my):
-                            context_items = win.context_menu_data
-                            break
-                    if context_items is None:
-                        context_items = taskbar_cfg.get("desktop_context_menu", [])
-
-                    if context_items:
-                        active_context_menu = Menu(context_items, mx, my)
-                    continue
-
+            screen.fill(SYSTEM_CONFIG["bg_color"])
+    
+            wm.draw(screen)
+            selection_box.draw(screen)
+    
             if active_context_menu:
-                if active_context_menu.handle_event(event, handle_menu_action, close_context_menu):
-                    continue
+                active_context_menu.draw(screen)
+    
+            taskbar.draw(screen, wm.windows, wm.get_top_window(), current_user, current_role)
+    
+        pygame.display.flip()
+        clock.tick(120)
 
-            if taskbar.handle_event(event, handle_menu_action, wm):
-                close_context_menu()
-                continue
-
-            if wm.handle_event(event):
-                close_context_menu()
-                continue
-
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if event.pos[1] < HEIGHT - TASKBAR_HEIGHT:
-                    selection_box.start(event.pos)
-            elif event.type == pygame.MOUSEMOTION:
-                selection_box.update(event.pos)
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                selection_box.stop()
-
-    if current_state == STATE_BOOT:
-        screen.fill(COLOR_BLACK)
-        boot_timer += 1
-        txt = font_large.render("SYSTEM STARTING...", True, COLOR_WHITE)
-        screen.blit(txt, (WIDTH // 2 - 130, HEIGHT // 2 - 40))
-
-        pygame.draw.rect(screen, COLOR_WHITE, (WIDTH // 2 - 150, HEIGHT // 2 + 20, 300, 12), 1)
-        pygame.draw.rect(screen, COLOR_WHITE, (WIDTH // 2 - 148, HEIGHT // 2 + 22, boot_timer * 2.95, 8))
-
-        if boot_timer >= 100:
-            current_state = STATE_LOGIN
-
-    elif current_state == STATE_LOGIN:
-        screen.fill(COLOR_BG)
-        box = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 80, 300, 170)
-        pygame.draw.rect(screen, COLOR_WIN_BG, box)
-        pygame.draw.line(screen, COLOR_WHITE, box.topleft, box.topright)
-        pygame.draw.line(screen, COLOR_WHITE, box.topleft, box.bottomleft)
-        pygame.draw.line(screen, COLOR_BLACK, box.bottomleft, box.bottomright)
-        pygame.draw.line(screen, COLOR_BLACK, box.topright, box.bottomright)
-
-        screen.blit(font.render("用户登录", True, COLOR_BLACK), (box.x + 120, box.y + 12))
-        screen.blit(font.render("账号:", True, COLOR_BLACK), (box.x + 25, box.y + 42))
-        screen.blit(font.render("密码:", True, COLOR_BLACK), (box.x + 25, box.y + 72))
-
-        login_tb_user.draw(screen, 0, 0)
-        login_tb_pass.draw(screen, 0, 0)
-
-        btn_login_rect = pygame.Rect(WIDTH // 2 - 60, HEIGHT // 2 + 35, 120, 26)
-        pygame.draw.rect(screen, COLOR_WIN_BG, btn_login_rect)
-        pygame.draw.line(screen, COLOR_WHITE, btn_login_rect.topleft, btn_login_rect.topright)
-        pygame.draw.line(screen, COLOR_WHITE, btn_login_rect.topleft, btn_login_rect.bottomleft)
-        pygame.draw.line(screen, COLOR_BLACK, btn_login_rect.bottomleft, btn_login_rect.bottomright)
-        pygame.draw.line(screen, COLOR_BLACK, btn_login_rect.topright, btn_login_rect.bottomright)
-        screen.blit(font.render("登 录", True, COLOR_BLACK), (btn_login_rect.x + 44, btn_login_rect.y + 4))
-
-        if login_msg:
-            screen.blit(font.render(login_msg, True, (200, 0, 0)), (box.x + 80, box.y + 138))
-
-    elif current_state == STATE_DESKTOP:
-        screen.fill(SYSTEM_CONFIG["bg_color"])
-
-        wm.draw(screen)
-        selection_box.draw(screen)
-
-        if active_context_menu:
-            active_context_menu.draw(screen)
-
-        taskbar.draw(screen, wm.windows, wm.get_top_window(), current_user, current_role)
-
-    pygame.display.flip()
-    clock.tick(120)
+if __name__ == "__main__":
+    main()

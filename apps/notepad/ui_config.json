@@ -1,0 +1,15 @@
+{
+  "title": "记事本",
+  "x": 120,
+  "y": 90,
+  "w": 460,
+  "h": 340,
+  "menu_bar": [],
+  "children": [
+    { "type": "label", "text": "文件名:", "x": 12, "y": 12 },
+    { "type": "textbox", "id": "txt_file", "text": "note.txt", "x": 70, "y": 10, "w": 180, "h": 22 },
+    { "type": "button", "id": "btn_new", "text": "新建", "x": 262, "y": 10, "w": 52, "h": 22 },
+    { "type": "button", "id": "btn_open", "text": "打开", "x": 320, "y": 10, "w": 52, "h": 22 },
+    { "type": "button", "id": "btn_save", "text": "保存", "x": 378, "y": 10, "w": 52, "h": 22 }
+  ]
+}
